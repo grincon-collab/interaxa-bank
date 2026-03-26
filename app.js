@@ -232,84 +232,35 @@ function calcular() {
 }
 
 // ─────────────────────────────────────────────
-// GENESYS CLOUD — DATA ACTION CONFIG (apiWA.json)
-// Basado en: WTL_Workautomation_Credito_V2
+// PROXY CONFIG
+// El browser llama al proxy local → el proxy llama a Genesys sin restricción CORS.
+// En producción reemplaza con la URL de tu servidor:
+//   const PROXY_URL = 'https://tu-servidor.com/api/solicitar-credito';
 // ─────────────────────────────────────────────
-const DATA_ACTION_CONFIG = {
-  tokenUrl:   'https://login.mypurecloud.com/oauth/token',
-  workitemUrl: 'https://api.mypurecloud.com/api/v2/taskmanagement/workitems',
-  typeId:      '0eb59c4e-b628-4b1e-9c83-7cc9ba8c3f2f',
-  queueId:     '4a63f06a-ff43-44f2-b4b1-7524162210a1',
-  workitemName: 'WTL_Credito',
-};
+const PROXY_URL = window.location.origin + '/api/solicitar-credito';
 
 // ─────────────────────────────────────────────
-// GENESYS — STEP 1: Obtener Token OAuth
-// (Client Credentials — igual a apiWA.json)
-// ─────────────────────────────────────────────
-async function getGenesysToken() {
-  const credentials = btoa(
-    '1eb69ae7-1be2-4d73-a55e-fc0308fcbf1d' + ':' +
-    '94pT8m2Jm4ZfIyCyxzaJwMJWXa4GF2r3tlyuv_qaw2E'
-  );
-
-  console.log('Step 1: Solicitando Token OAuth...');
-
-  const response = await fetch(DATA_ACTION_CONFIG.tokenUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + credentials,
-      'Content-Type':  'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error('Auth error: ' + (err.error_description || response.status));
-  }
-
-  const data = await response.json();
-  return data.access_token;
-}
-
-// ─────────────────────────────────────────────
-// GENESYS — STEP 2: Crear Workitem
-// Estructura basada en apiWA.json → createWorkitem()
+// ENVIAR SOLICITUD AL PROXY → GENESYS
 //
-// Mapeo de campos (input → formulario/simulador):
-//   input.documento_text       ← campo "Número de documento"    (formulario)
-//   input.nombre_cliente_text  ← campo "Nombre completo"        (formulario)
-//   input.tipo_credito_text    ← selección "Tipo de crédito"    (simulador)
-//   input.valor_credito_text   ← valor "Monto solicitado" en COP (simulador)
-//   input.telefono_cliente_text← campo "Teléfono / WhatsApp"   (formulario)
+// Mapeo de campos:
+//   input.documento_text        ← campo "Número de documento"   (formulario)
+//   input.nombre_cliente_text   ← campo "Nombre completo"       (formulario)
+//   input.tipo_credito_text     ← selección "Tipo de crédito"   (simulador)
+//   input.valor_credito_text    ← "Monto solicitado" en COP     (simulador)
+//   input.telefono_cliente_text ← campo "Teléfono / WhatsApp"   (formulario)
 // ─────────────────────────────────────────────
-async function createGenesysWorkitem(token, input) {
-  console.log('Step 2: Creando Workitem en Genesys Cloud...');
+async function enviarSolicitudGenesys(input) {
+  console.log('Enviando solicitud al proxy...', input);
 
-  const response = await fetch(DATA_ACTION_CONFIG.workitemUrl, {
+  const response = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + token,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      name:    DATA_ACTION_CONFIG.workitemName,
-      typeId:  DATA_ACTION_CONFIG.typeId,
-      queueId: DATA_ACTION_CONFIG.queueId,
-      customFields: {
-        documento_text:        input.documento_text,        // ← Número de documento (formulario)
-        nombre_cliente_text:   input.nombre_cliente_text,   // ← Nombre completo     (formulario)
-        tipo_credito_text:     input.tipo_credito_text,     // ← Tipo de crédito     (simulador)
-        valor_credito_text:    input.valor_credito_text,    // ← Monto solicitado    (simulador)
-        telefono_cliente_text: input.telefono_cliente_text, // ← Teléfono/WhatsApp   (formulario)
-      },
-    }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error('Workitem error: ' + (err.message || response.status));
+    throw new Error(err.error || 'Error al enviar la solicitud (' + response.status + ')');
   }
 
   return await response.json();
@@ -392,9 +343,8 @@ async function requestCredit() {
   setButtonState(true);
 
   try {
-    // 4. Step 1: Obtener token → Step 2: Crear Workitem
-    const token  = await getGenesysToken();
-    const result = await createGenesysWorkitem(token, input);
+    // 4. Enviar al proxy → proxy llama a Genesys (resuelve CORS)
+    const result = await enviarSolicitudGenesys(input);
 
     console.log('✅ Workitem creado ID:', result.id);
     showToast('✅ Solicitud enviada. Un asesor te contactará pronto.');
