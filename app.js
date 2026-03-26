@@ -232,36 +232,37 @@ function calcular() {
 }
 
 // ─────────────────────────────────────────────
-// GENESYS CLOUD — WORKITEM CONFIG
+// GENESYS CLOUD — DATA ACTION CONFIG (apiWA.json)
+// Basado en: WTL_Workautomation_Credito_V2
 // ─────────────────────────────────────────────
-const GENESYS_CONFIG = {
-  clientId:     '1eb69ae7-1be2-4d73-a55e-fc0308fcbf1d',
-  clientSecret: '94pT8m2Jm4ZfIyCyxzaJwMJWXa4GF2r3tlyuv_qaw2E',
-  environment:  'mypurecloud.com',
-  workitem: {
-    name:   'WTL_Credito',
-    typeId:  '0eb59c4e-b628-4b1e-9c83-7cc9ba8c3f2f',
-    queueId: '4a63f06a-ff43-44f2-b4b1-7524162210a1',
-  },
+const DATA_ACTION_CONFIG = {
+  tokenUrl:   'https://login.mypurecloud.com/oauth/token',
+  workitemUrl: 'https://api.mypurecloud.com/api/v2/taskmanagement/workitems',
+  typeId:      '0eb59c4e-b628-4b1e-9c83-7cc9ba8c3f2f',
+  queueId:     '4a63f06a-ff43-44f2-b4b1-7524162210a1',
+  workitemName: 'WTL_Credito',
 };
 
 // ─────────────────────────────────────────────
-// GENESYS — GET ACCESS TOKEN (client credentials)
+// GENESYS — STEP 1: Obtener Token OAuth
+// (Client Credentials — igual a apiWA.json)
 // ─────────────────────────────────────────────
 async function getGenesysToken() {
-  const credentials = btoa(GENESYS_CONFIG.clientId + ':' + GENESYS_CONFIG.clientSecret);
-
-  const response = await fetch(
-    'https://login.' + GENESYS_CONFIG.environment + '/oauth/token',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + credentials,
-        'Content-Type':  'application/x-www-form-urlencoded',
-      },
-      body: 'grant_type=client_credentials',
-    }
+  const credentials = btoa(
+    '1eb69ae7-1be2-4d73-a55e-fc0308fcbf1d' + ':' +
+    '94pT8m2Jm4ZfIyCyxzaJwMJWXa4GF2r3tlyuv_qaw2E'
   );
+
+  console.log('Step 1: Solicitando Token OAuth...');
+
+  const response = await fetch(DATA_ACTION_CONFIG.tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + credentials,
+      'Content-Type':  'application/x-www-form-urlencoded',
+    },
+    body: 'grant_type=client_credentials',
+  });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -273,30 +274,38 @@ async function getGenesysToken() {
 }
 
 // ─────────────────────────────────────────────
-// GENESYS — CREATE WORKITEM
+// GENESYS — STEP 2: Crear Workitem
+// Estructura basada en apiWA.json → createWorkitem()
+//
+// Mapeo de campos (input → formulario/simulador):
+//   input.documento_text       ← campo "Número de documento"    (formulario)
+//   input.nombre_cliente_text  ← campo "Nombre completo"        (formulario)
+//   input.tipo_credito_text    ← selección "Tipo de crédito"    (simulador)
+//   input.valor_credito_text   ← valor "Monto solicitado" en COP (simulador)
+//   input.telefono_cliente_text← campo "Teléfono / WhatsApp"   (formulario)
 // ─────────────────────────────────────────────
-async function createGenesysWorkitem(token, datosCliente) {
-  const response = await fetch(
-    'https://api.' + GENESYS_CONFIG.environment + '/api/v2/taskmanagement/workitems',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type':  'application/json',
+async function createGenesysWorkitem(token, input) {
+  console.log('Step 2: Creando Workitem en Genesys Cloud...');
+
+  const response = await fetch(DATA_ACTION_CONFIG.workitemUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      name:    DATA_ACTION_CONFIG.workitemName,
+      typeId:  DATA_ACTION_CONFIG.typeId,
+      queueId: DATA_ACTION_CONFIG.queueId,
+      customFields: {
+        documento_text:        input.documento_text,        // ← Número de documento (formulario)
+        nombre_cliente_text:   input.nombre_cliente_text,   // ← Nombre completo     (formulario)
+        tipo_credito_text:     input.tipo_credito_text,     // ← Tipo de crédito     (simulador)
+        valor_credito_text:    input.valor_credito_text,    // ← Monto solicitado    (simulador)
+        telefono_cliente_text: input.telefono_cliente_text, // ← Teléfono/WhatsApp   (formulario)
       },
-      body: JSON.stringify({
-        name:    GENESYS_CONFIG.workitem.name,
-        typeId:  GENESYS_CONFIG.workitem.typeId,
-        queueId: GENESYS_CONFIG.workitem.queueId,
-        customFields: {
-          documento_text:       datosCliente.documento,
-          nombre_cliente_text:  datosCliente.nombre,
-          tipo_credito_text:    datosCliente.tipo,
-          valor_credito_text:   datosCliente.valor,
-        },
-      }),
-    }
-  );
+    }),
+  });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
@@ -360,52 +369,54 @@ function setButtonState(loading) {
 // CTA — REQUEST CREDIT (main conversion action)
 // ─────────────────────────────────────────────
 async function requestCredit() {
-  // 1. Validate contact form
+
+  // 1. Validar formulario de contacto
   const contactData = getContactFormData();
   if (!contactData) return;
 
-  // 2. Read simulator values
-  const monto = parseFloat(document.getElementById('monto').value);
-  const plazo = document.getElementById('plazo').value;
-  const valor = String(Math.round(monto * 1000000));
+  // 2. Leer valores del simulador
+  const montoMillones = parseFloat(document.getElementById('monto').value);
+  const plazo         = document.getElementById('plazo').value;
+  const valorCOP      = String(Math.round(montoMillones * 1000000));
 
-  // 3. Build payload for Genesys
-  const datosCliente = {
-    nombre:    contactData.nombre,
-    documento: contactData.documento,
-    telefono:  contactData.telefono,
-    tipo:      currentType,
-    valor:     valor,
+  // 3. Construir objeto input con los nombres exactos de apiWA.json
+  //    y poblar cada campo desde su fuente correspondiente:
+  const input = {
+    documento_text:        contactData.documento,   // ← "Número de documento"  (formulario)
+    nombre_cliente_text:   contactData.nombre,      // ← "Nombre completo"      (formulario)
+    tipo_credito_text:     currentType,             // ← "Tipo de crédito"      (simulador)
+    valor_credito_text:    valorCOP,                // ← "Monto solicitado" COP (simulador)
+    telefono_cliente_text: contactData.telefono,    // ← "Teléfono / WhatsApp"  (formulario)
   };
 
   setButtonState(true);
 
   try {
-    // 4. Auth → Workitem
+    // 4. Step 1: Obtener token → Step 2: Crear Workitem
     const token  = await getGenesysToken();
-    const result = await createGenesysWorkitem(token, datosCliente);
+    const result = await createGenesysWorkitem(token, input);
 
-    console.log('Workitem creado:', result.id);
+    console.log('✅ Workitem creado ID:', result.id);
     showToast('✅ Solicitud enviada. Un asesor te contactará pronto.');
 
-    // 5. IXTrack conversion event
+    // 5. IXTrack — evento de conversión
     if (typeof IXTrack !== 'undefined') {
       IXTrack.event('conversion', 'credit_requested', {
         credit_type:     currentType,
-        amount_millions: String(monto),
+        amount_millions: String(montoMillones),
         term_months:     plazo,
         workitem_id:     result.id || '',
         label:           'Solicitud ' + currentType,
       });
     }
 
-    // 6. Clear form after success
+    // 6. Limpiar formulario tras éxito
     document.getElementById('clienteNombre').value    = '';
     document.getElementById('clienteDocumento').value = '';
     document.getElementById('clienteTelefono').value  = '';
 
   } catch (error) {
-    console.error('Error enviando solicitud:', error);
+    console.error('❌ Error enviando solicitud:', error);
     showToast('❌ Error al enviar la solicitud. Intenta de nuevo.');
 
     if (typeof IXTrack !== 'undefined') {
