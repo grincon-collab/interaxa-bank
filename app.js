@@ -1,175 +1,417 @@
 /**
  * Interaxa Bank — Main Application Script
- * 
+ * ============================================================
  * Handles:
- *  - Page navigation (SPA routing)
+ *  - SPA page navigation  (calls IXTrack.page on every route)
  *  - Toast notifications
- *  - Credit simulator (French amortization system)
- *  - Range slider UI updates
+ *  - Credit simulator     (French amortization + IXTrack events)
+ *  - Range slider UI
  *  - Radio option selectors
+ *
+ * Analytics events fired:
+ *  IXTrack.page()          → on every virtual page view
+ *  IXTrack.event()         → simulator use, CTA clicks, product views
+ *  IXTrack.highIntentSignal() → large loan amounts (≥ $50M)
+ * ============================================================
  */
 
 'use strict';
-// ── NAVIGATION ──
-  function showPage(id) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-    const navEl = document.getElementById('nav-' + id);
-    if (navEl) navEl.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+// ─────────────────────────────────────────────
+// PAGE LABELS
+// ─────────────────────────────────────────────
+const PAGE_TITLES = {
+  home:      'Inicio',
+  personal:  'Banca Personal',
+  business:  'Banca Empresarial',
+  simulator: 'Simulador de Crédito',
+  services:  'Nosotros',
+};
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+
+  document.getElementById(id).classList.add('active');
+
+  const navEl = document.getElementById('nav-' + id);
+  if (navEl) navEl.classList.add('active');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // ── Tracking: virtual page view ──
+  if (typeof IXTrack !== 'undefined') {
+    IXTrack.page(id, PAGE_TITLES[id] || id);
+  }
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─────────────────────────────────────────────
+// SIMULATOR — RADIO OPTIONS
+// ─────────────────────────────────────────────
+let currentType  = 'Libre Inversion';
+let currentModal = 'Fija mensual';
+
+const RATES_BY_TYPE = {
+  'Libre Inversion': 18.5,
+  'Hipotecario':     10.9,
+  'Vehiculo':        15.2,
+  'Empresarial':     14.5,
+};
+
+function selectType(el, val) {
+  document.querySelectorAll('#creditType .radio-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentType = val;
+
+  const rangeTasa = document.getElementById('tasa');
+  rangeTasa.value = RATES_BY_TYPE[val] || 18.5;
+  updateTasa(rangeTasa);
+
+  if (typeof IXTrack !== 'undefined') {
+    IXTrack.event('simulator', 'type_selected', { credit_type: val });
+  }
+}
+
+function selectModal(el, val) {
+  document.querySelectorAll('#modalidad .radio-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  currentModal = val;
+}
+
+// ─────────────────────────────────────────────
+// SIMULATOR — RANGE SLIDERS
+// ─────────────────────────────────────────────
+function fmtMoney(n) {
+  return new Intl.NumberFormat('es-CO').format(n * 1000000);
+}
+
+function updateMonto(el) {
+  document.getElementById('montoVal').textContent = '$' + fmtMoney(el.value);
+  const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+  el.style.setProperty('--val', pct);
+}
+
+function updatePlazo(el) {
+  document.getElementById('plazoVal').textContent = el.value + ' meses';
+  const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+  el.style.setProperty('--val', pct);
+}
+
+function updateTasa(el) {
+  document.getElementById('tasaVal').textContent = parseFloat(el.value).toFixed(1) + '%';
+  const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+  el.style.setProperty('--val', pct);
+}
+
+// ─────────────────────────────────────────────
+// SIMULATOR — CALCULATE (French amortization)
+// ─────────────────────────────────────────────
+function calcular() {
+  const monto  = parseFloat(document.getElementById('monto').value) * 1000000;
+  const plazo  = parseInt(document.getElementById('plazo').value);
+  const tasaEA = parseFloat(document.getElementById('tasa').value) / 100;
+
+  const tasaMensual = Math.pow(1 + tasaEA, 1 / 12) - 1;
+  const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazo))
+                      / (Math.pow(1 + tasaMensual, plazo) - 1);
+  const totalPagado    = cuota * plazo;
+  const totalIntereses = totalPagado - monto;
+
+  let saldo = monto;
+  const tabla = [];
+  for (let i = 1; i <= plazo; i++) {
+    const interes = saldo * tasaMensual;
+    const capital = cuota - interes;
+    saldo -= capital;
+    tabla.push({ mes: i, cuota, interes, capital, saldo: Math.max(0, saldo) });
   }
 
-  // ── TOAST ──
-  function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+  const fmt = n => new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', maximumFractionDigits: 0,
+  }).format(n);
+
+  const preview = tabla.slice(0, 8);
+  const montoM  = (monto / 1000000).toFixed(0);
+
+  // ── Tracking ──
+  if (typeof IXTrack !== 'undefined') {
+    IXTrack.event('simulator', 'calculated', {
+      credit_type:     currentType,
+      amount_millions: montoM,
+      term_months:     String(plazo),
+      rate_ea:         String((tasaEA * 100).toFixed(2)),
+      monthly_payment: String(Math.round(cuota)),
+      total_interest:  String(Math.round(totalIntereses)),
+      label:           currentType + ' $' + montoM + 'M / ' + plazo + 'm',
+    });
+
+    // High-intent signal for large loan amounts
+    if (monto >= 50000000) {
+      IXTrack.highIntentSignal('large_loan_simulated', {
+        amount_millions: montoM,
+        credit_type: currentType,
+      });
+    }
   }
 
-  // ── RADIO OPTIONS ──
-  let currentType = 'Libre Inversión';
-  let currentModal = 'Fija mensual';
+  document.getElementById('simResults').innerHTML = `
+    <div class="result-hero">
+      <div class="result-label">CUOTA MENSUAL ESTIMADA</div>
+      <div class="result-amount">${fmt(cuota)}</div>
+      <div class="result-amount-sub">por ${plazo} meses</div>
+      <div class="result-meta">
+        <div class="result-meta-item">
+          <div class="result-meta-val">${fmt(monto)}</div>
+          <div class="result-meta-key">Monto solicitado</div>
+        </div>
+        <div class="result-meta-item">
+          <div class="result-meta-val">${(tasaEA * 100).toFixed(1)}% E.A.</div>
+          <div class="result-meta-key">Tasa efectiva anual</div>
+        </div>
+        <div class="result-meta-item">
+          <div class="result-meta-val">${plazo} m</div>
+          <div class="result-meta-key">Plazo</div>
+        </div>
+      </div>
+    </div>
 
-  function selectType(el, val) {
-    document.querySelectorAll('#creditType .radio-option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
-    currentType = val;
-    const rates = { 'Libre Inversión': 18.5, 'Hipotecario': 10.9, 'Vehículo': 15.2, 'Empresarial': 14.5 };
-    const rangeTasa = document.getElementById('tasa');
-    rangeTasa.value = rates[val];
-    updateTasa(rangeTasa);
+    <div class="result-breakdown">
+      <div class="breakdown-title">📊 Resumen financiero · ${currentType}</div>
+      <div class="breakdown-row"><span class="key">Capital solicitado</span><span class="val">${fmt(monto)}</span></div>
+      <div class="breakdown-row"><span class="key">Total intereses</span><span class="val gold">${fmt(totalIntereses)}</span></div>
+      <div class="breakdown-row"><span class="key">Total a pagar</span><span class="val">${fmt(totalPagado)}</span></div>
+      <div class="breakdown-row"><span class="key">Tasa mensual efectiva</span><span class="val">${(tasaMensual * 100).toFixed(4)}% M.E.</span></div>
+      <div class="breakdown-row"><span class="key">Tasa E.A.</span><span class="val">${(tasaEA * 100).toFixed(2)}% E.A.</span></div>
+      <div class="breakdown-row"><span class="key">Modalidad</span><span class="val">${currentModal}</span></div>
+      <div class="breakdown-row"><span class="key">Costo total del crédito</span><span class="val gold">${((totalIntereses / monto) * 100).toFixed(1)}% sobre capital</span></div>
+    </div>
+
+    <div class="amort-table">
+      <div class="amort-header">
+        <span>📋 Tabla de amortización (8 primeras cuotas)</span>
+        <span class="amort-system">Sistema francés</span>
+      </div>
+      <div class="amort-scroll">
+        <table>
+          <thead>
+            <tr><th>Mes</th><th>Cuota</th><th>Capital</th><th>Interés</th><th>Saldo</th></tr>
+          </thead>
+          <tbody>
+            ${preview.map((r, i) => `
+              <tr class="${i === 0 ? 'highlight-row' : ''}">
+                <td>${r.mes}</td>
+                <td>${fmt(r.cuota)}</td>
+                <td>${fmt(r.capital)}</td>
+                <td>${fmt(r.interes)}</td>
+                <td>${fmt(r.saldo)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sim-cta-wrap">
+      <button class="btn btn-gold" onclick="requestCredit()">✅ Solicitar este crédito</button>
+      <p class="sim-disclaimer">* Simulación informativa. Las condiciones finales están sujetas a estudio de crédito.</p>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// GENESYS CLOUD — WORKITEM CONFIG
+// ─────────────────────────────────────────────
+const GENESYS_CONFIG = {
+  clientId:     '1eb69ae7-1be2-4d73-a55e-fc0308fcbf1d',
+  clientSecret: '94pT8m2Jm4ZfIyCyxzaJwMJWXa4GF2r3tlyuv_qaw2E',
+  environment:  'mypurecloud.com',
+  workitem: {
+    name:   'WTL_Credito',
+    typeId:  '0eb59c4e-b628-4b1e-9c83-7cc9ba8c3f2f',
+    queueId: '4a63f06a-ff43-44f2-b4b1-7524162210a1',
+  },
+};
+
+// ─────────────────────────────────────────────
+// GENESYS — GET ACCESS TOKEN (client credentials)
+// ─────────────────────────────────────────────
+async function getGenesysToken() {
+  const credentials = btoa(GENESYS_CONFIG.clientId + ':' + GENESYS_CONFIG.clientSecret);
+
+  const response = await fetch(
+    'https://login.' + GENESYS_CONFIG.environment + '/oauth/token',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + credentials,
+        'Content-Type':  'application/x-www-form-urlencoded',
+      },
+      body: 'grant_type=client_credentials',
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error('Auth error: ' + (err.error_description || response.status));
   }
 
-  function selectModal(el, val) {
-    document.querySelectorAll('#modalidad .radio-option').forEach(o => o.classList.remove('selected'));
-    el.classList.add('selected');
-    currentModal = val;
+  const data = await response.json();
+  return data.access_token;
+}
+
+// ─────────────────────────────────────────────
+// GENESYS — CREATE WORKITEM
+// ─────────────────────────────────────────────
+async function createGenesysWorkitem(token, datosCliente) {
+  const response = await fetch(
+    'https://api.' + GENESYS_CONFIG.environment + '/api/v2/taskmanagement/workitems',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({
+        name:    GENESYS_CONFIG.workitem.name,
+        typeId:  GENESYS_CONFIG.workitem.typeId,
+        queueId: GENESYS_CONFIG.workitem.queueId,
+        customFields: {
+          documento_text:       datosCliente.documento,
+          nombre_cliente_text:  datosCliente.nombre,
+          tipo_credito_text:    datosCliente.tipo,
+          valor_credito_text:   datosCliente.valor,
+        },
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error('Workitem error: ' + (err.message || response.status));
   }
 
-  // ── RANGE UPDATES ──
-  function fmtMoney(n) {
-    return new Intl.NumberFormat('es-CO').format(n * 1000000);
+  return await response.json();
+}
+
+// ─────────────────────────────────────────────
+// HELPERS — FORM VALIDATION
+// ─────────────────────────────────────────────
+function getContactFormData() {
+  const nombre    = document.getElementById('clienteNombre').value.trim();
+  const documento = document.getElementById('clienteDocumento').value.trim();
+  const telefono  = document.getElementById('clienteTelefono').value.trim();
+
+  const errorEl = document.getElementById('formErrorMsg');
+
+  if (!nombre) {
+    showFormError(errorEl, '⚠️ Por favor ingresa tu nombre completo.');
+    document.getElementById('clienteNombre').focus();
+    return null;
+  }
+  if (!documento || !/^\d{5,12}$/.test(documento)) {
+    showFormError(errorEl, '⚠️ Ingresa un número de documento válido (5–12 dígitos).');
+    document.getElementById('clienteDocumento').focus();
+    return null;
+  }
+  if (!telefono || !/^\d{7,15}$/.test(telefono)) {
+    showFormError(errorEl, '⚠️ Ingresa un teléfono válido (7–15 dígitos, sin espacios ni +).');
+    document.getElementById('clienteTelefono').focus();
+    return null;
   }
 
-  function updateMonto(el) {
-    document.getElementById('montoVal').textContent = '$' + fmtMoney(el.value);
-    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
-    el.style.setProperty('--val', pct);
+  errorEl.style.display = 'none';
+  return { nombre, documento, telefono };
+}
+
+function showFormError(el, msg) {
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function setButtonState(loading) {
+  // Update the button rendered inside simResults
+  const btn = document.querySelector('.sim-cta-wrap .btn-gold');
+  if (!btn) return;
+  if (loading) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Enviando solicitud...';
+    btn.style.opacity = '0.7';
+  } else {
+    btn.disabled = false;
+    btn.innerHTML = '✅ Solicitar este crédito';
+    btn.style.opacity = '1';
   }
+}
 
-  function updatePlazo(el) {
-    document.getElementById('plazoVal').textContent = el.value + ' meses';
-    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
-    el.style.setProperty('--val', pct);
-  }
+// ─────────────────────────────────────────────
+// CTA — REQUEST CREDIT (main conversion action)
+// ─────────────────────────────────────────────
+async function requestCredit() {
+  // 1. Validate contact form
+  const contactData = getContactFormData();
+  if (!contactData) return;
 
-  function updateTasa(el) {
-    document.getElementById('tasaVal').textContent = parseFloat(el.value).toFixed(1) + '%';
-    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
-    el.style.setProperty('--val', pct);
-  }
+  // 2. Read simulator values
+  const monto = parseFloat(document.getElementById('monto').value);
+  const plazo = document.getElementById('plazo').value;
+  const valor = String(Math.round(monto * 1000000));
 
-  // ── CALCULATE ──
-  function calcular() {
-    const monto = parseFloat(document.getElementById('monto').value) * 1000000;
-    const plazo = parseInt(document.getElementById('plazo').value);
-    const tasaEA = parseFloat(document.getElementById('tasa').value) / 100;
+  // 3. Build payload for Genesys
+  const datosCliente = {
+    nombre:    contactData.nombre,
+    documento: contactData.documento,
+    telefono:  contactData.telefono,
+    tipo:      currentType,
+    valor:     valor,
+  };
 
-    // Tasa mensual efectiva
-    const tasaMensual = Math.pow(1 + tasaEA, 1/12) - 1;
+  setButtonState(true);
 
-    // Cuota fija (sistema francés)
-    const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
+  try {
+    // 4. Auth → Workitem
+    const token  = await getGenesysToken();
+    const result = await createGenesysWorkitem(token, datosCliente);
 
-    const totalPagado = cuota * plazo;
-    const totalIntereses = totalPagado - monto;
+    console.log('Workitem creado:', result.id);
+    showToast('✅ Solicitud enviada. Un asesor te contactará pronto.');
 
-    // Amortización (primeros 12 + últimos 3 periodos)
-    let saldo = monto;
-    const tabla = [];
-    for (let i = 1; i <= plazo; i++) {
-      const interes = saldo * tasaMensual;
-      const capital = cuota - interes;
-      saldo -= capital;
-      tabla.push({ mes: i, cuota, interes, capital, saldo: Math.max(0, saldo) });
+    // 5. IXTrack conversion event
+    if (typeof IXTrack !== 'undefined') {
+      IXTrack.event('conversion', 'credit_requested', {
+        credit_type:     currentType,
+        amount_millions: String(monto),
+        term_months:     plazo,
+        workitem_id:     result.id || '',
+        label:           'Solicitud ' + currentType,
+      });
     }
 
-    // Format COP
-    const fmt = n => new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits: 0 }).format(n);
+    // 6. Clear form after success
+    document.getElementById('clienteNombre').value    = '';
+    document.getElementById('clienteDocumento').value = '';
+    document.getElementById('clienteTelefono').value  = '';
 
-    // Render results
-    const preview = tabla.slice(0, 8);
+  } catch (error) {
+    console.error('Error enviando solicitud:', error);
+    showToast('❌ Error al enviar la solicitud. Intenta de nuevo.');
 
-    document.getElementById('simResults').innerHTML = `
-      <div class="result-hero">
-        <div class="result-label">CUOTA MENSUAL ESTIMADA</div>
-        <div class="result-amount">${fmt(cuota)}</div>
-        <div class="result-amount-sub">por ${plazo} meses</div>
-        <div class="result-meta">
-          <div class="result-meta-item">
-            <div class="result-meta-val">${fmt(monto)}</div>
-            <div class="result-meta-key">Monto solicitado</div>
-          </div>
-          <div class="result-meta-item">
-            <div class="result-meta-val">${(tasaEA*100).toFixed(1)}% E.A.</div>
-            <div class="result-meta-key">Tasa efectiva anual</div>
-          </div>
-          <div class="result-meta-item">
-            <div class="result-meta-val">${plazo} m</div>
-            <div class="result-meta-key">Plazo</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="result-breakdown">
-        <div class="breakdown-title">📊 Resumen financiero · ${currentType}</div>
-        <div class="breakdown-row"><span class="key">Capital solicitado</span><span class="val">${fmt(monto)}</span></div>
-        <div class="breakdown-row"><span class="key">Total intereses</span><span class="val gold">${fmt(totalIntereses)}</span></div>
-        <div class="breakdown-row"><span class="key">Total a pagar</span><span class="val">${fmt(totalPagado)}</span></div>
-        <div class="breakdown-row"><span class="key">Tasa mensual efectiva</span><span class="val">${(tasaMensual*100).toFixed(4)}% M.E.</span></div>
-        <div class="breakdown-row"><span class="key">Tasa E.A.</span><span class="val">${(tasaEA*100).toFixed(2)}% E.A.</span></div>
-        <div class="breakdown-row"><span class="key">Modalidad</span><span class="val">${currentModal}</span></div>
-        <div class="breakdown-row"><span class="key">Costo total del crédito</span><span class="val gold">${((totalIntereses/monto)*100).toFixed(1)}% sobre capital</span></div>
-      </div>
-
-      <div class="amort-table">
-        <div class="amort-header">
-          <span>📋 Tabla de amortización (8 primeras cuotas)</span>
-          <span style="font-size:12px; color:var(--gray); font-weight:400;">Sistema francés</span>
-        </div>
-        <div class="amort-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th>Mes</th>
-                <th>Cuota</th>
-                <th>Capital</th>
-                <th>Interés</th>
-                <th>Saldo</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${preview.map((r, i) => `
-                <tr class="${i === 0 ? 'highlight-row' : ''}">
-                  <td>${r.mes}</td>
-                  <td>${fmt(r.cuota)}</td>
-                  <td>${fmt(r.capital)}</td>
-                  <td>${fmt(r.interes)}</td>
-                  <td>${fmt(r.saldo)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div style="text-align:center; padding:4px 0;">
-        <button class="btn btn-gold" onclick="showToast('✅ Solicitud enviada. Un asesor te contactará pronto.')">
-          ✅ Solicitar este crédito
-        </button>
-        <p style="font-size:11px; color:var(--gray); margin-top:10px;">* Simulación informativa. Las condiciones finales están sujetas a estudio de crédito.</p>
-      </div>
-    `;
+    if (typeof IXTrack !== 'undefined') {
+      IXTrack.event('error', 'workitem_failed', { message: error.message });
+    }
+  } finally {
+    setButtonState(false);
   }
+}
