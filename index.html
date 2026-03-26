@@ -6,13 +6,13 @@
   <title>Interaxa Bank — Banca del Futuro</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
-  
+
   <script>
     (function(a,t,c,l,o,u,d){a['_genesysJourneySdk']=o;a[o]=a[o]||function(){
     (a[o].q=a[o].q||[]).push(arguments)},a[o].l=1*new Date();u=t.createElement(c),
     d=t.getElementsByTagName(c)[0];u.async=1;u.src=l;u.charset='utf-8';d.parentNode.insertBefore(u,d)
     })(window, document, 'script', 'https://apps.mypurecloud.com/journey/sdk/js/web/v1/ac.js', 'ac');
-    ac('init', '', { region: 'use1' });
+    ac('init', '', { region: 'use1' }); // Ajustar region si es necesario
     ac('load', 'autotrackUrlChange');
   </script>
 </head>
@@ -20,7 +20,7 @@
 
 <nav>
   <a href="#" class="nav-logo" onclick="showPage('home')">
-    <img src="data:image/jpeg;base64,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" class="nav-logo-img" alt="Interaxa">
+    <img src="data:image/jpeg;base64,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" class="nav-logo-img" alt="Interaxa">
     <span class="nav-logo-bank">Bank</span>
   </a>
   <ul class="nav-links">
@@ -33,99 +33,41 @@
   </ul>
 </nav>
 
-<div id="home" class="page active">
-    </div>
-
-<div id="simulator" class="page">
-  <section class="bg-navy panel-top">
-    <div class="section-tag">Herramienta financiera</div>
-    <h2 class="section-title text-white">Simulador de Crédito</h2>
-    <p class="section-sub text-muted">Descubre cuánto puedes solicitar y cuáles serán tus cuotas.</p>
-  </section>
-
-  <section class="bg-cream panel-sm">
-    <div class="simulator-wrapper">
-      <div class="sim-form-card">
-        <h2 class="sim-title">Configura tu crédito</h2>
-        <div class="form-group">
-          <label>Tipo de crédito</label>
-          <div class="radio-group" id="creditType">
-            <div class="radio-option selected" onclick="selectType(this,'Libre Inversión')">Libre Inversión</div>
-            <div class="radio-option" onclick="selectType(this,'Hipotecario')">Hipotecario</div>
-            <div class="radio-option" onclick="selectType(this,'Vehículo')">Vehículo</div>
-            <div class="radio-option" onclick="selectType(this,'Empresarial')">Empresarial</div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Monto solicitado</label>
-          <div class="range-val" id="montoVal">$20.000.000</div>
-          <input type="range" id="monto" min="1" max="200" value="20" step="1" oninput="updateMonto(this)" style="--val:10%">
-          <div class="range-labels"><span>$1M</span><span>$200M</span></div>
-        </div>
-
-        <div class="form-group">
-          <label>Plazo (meses)</label>
-          <div class="range-val" id="plazoVal">36 meses</div>
-          <input type="range" id="plazo" min="6" max="360" value="36" step="6" oninput="updatePlazo(this)" style="--val:8%">
-          <div class="range-labels"><span>6 m</span><span>360 m</span></div>
-        </div>
-
-        <div class="form-group">
-          <label>Tasa de interés E.A. (%)</label>
-          <div class="range-val" id="tasaVal">18.5%</div>
-          <input type="range" id="tasa" min="5" max="35" value="18.5" step="0.5" oninput="updateTasa(this)" style="--val:38%">
-        </div>
-
-        <button class="calc-btn" onclick="calcular()">🧮 Calcular simulación</button>
-      </div>
-
-      <div class="sim-results" id="simResults">
-        <div class="sim-placeholder">
-          <div class="sim-placeholder-icon">🧮</div>
-          <h3 class="sim-placeholder-title">Configura tu crédito</h3>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
-
 <footer>
-    </footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <img src="data:image/jpeg;base64,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" class="footer-logo-img" alt="Interaxa">
+        <span class="footer-logo-bank">Bank</span>
+      </div>
+      <p>Banco vigilado por la Superintendencia Financiera de Colombia. Depósitos asegurados por Fogafin hasta $50 millones.</p>
+    </div>
+    </div>
+</footer>
 
 <div id="modalSolicitud" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center; font-family:'DM Sans', sans-serif;">
-  <div style="background:white; padding:40px; border-radius:15px; width:90%; max-width:450px; box-shadow:0 20px 40px rgba(0,0,0,0.3);">
+  <div style="background:white; padding:40px; border-radius:15px; width:90%; max-width:450px;">
     <h2 style="color:#001E42; margin-bottom:10px;">Finalizar Solicitud</h2>
-    <p style="color:#666; margin-bottom:25px; font-size:14px;">Completa tus datos para que un asesor de Interaxa Bank procese tu crédito.</p>
+    <p style="color:#666; margin-bottom:25px; font-size:14px;">Completa tus datos para procesar el crédito en Genesys.</p>
     
     <form id="formCredito">
       <div style="margin-bottom:15px;">
         <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Documento de Identidad</label>
-        <input type="text" id="docId" required placeholder="Ej: 10203040" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
+        <input type="text" id="docId" required style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
       </div>
       <div style="margin-bottom:15px;">
         <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Nombre Completo</label>
-        <input type="text" id="nombreCompleto" required placeholder="Ej: Juan Pérez" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
+        <input type="text" id="nombreCompleto" required style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
       </div>
-      <div style="margin-bottom:15px;">
-        <label style="display:block; font-size:12px; font-weight:bold; margin-bottom:5px;">Teléfono de Contacto</label>
-        <input type="tel" id="telCliente" required placeholder="Ej: 3001234567" style="width:100%; padding:12px; border:1px solid #ddd; border-radius:8px;">
-      </div>
-      
       <div style="background:#f4f7fa; padding:15px; border-radius:8px; margin-bottom:25px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-          <span style="font-size:12px; color:#555;">Tipo de Crédito:</span>
-          <span id="confirmTipo" style="font-size:12px; font-weight:bold; color:#001E42;">-</span>
-        </div>
         <div style="display:flex; justify-content:space-between;">
-          <span style="font-size:12px; color:#555;">Monto Simulado:</span>
-          <span id="confirmMonto" style="font-size:12px; font-weight:bold; color:#D4AF37;">-</span>
+          <span style="font-size:12px;">Monto Simulado:</span>
+          <span id="confirmMonto" style="font-size:12px; font-weight:bold;">-</span>
         </div>
       </div>
-
       <div style="display:flex; gap:15px;">
-        <button type="button" onclick="cerrarModal()" style="flex:1; padding:14px; background:#eee; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Cancelar</button>
-        <button type="submit" style="flex:2; padding:14px; background:#D4AF37; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Enviar a Genesys</button>
+        <button type="button" onclick="cerrarModal()" style="flex:1; padding:12px; border:none; border-radius:8px; cursor:pointer;">Cancelar</button>
+        <button type="submit" style="flex:2; padding:12px; background:#D4AF37; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Enviar a Genesys</button>
       </div>
     </form>
   </div>
@@ -133,6 +75,5 @@
 
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
-
 </body>
 </html>
