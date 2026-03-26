@@ -32,7 +32,7 @@ const PORT = process.env.PORT || 3000;
 
 const DATA_ACTION_CONFIG = {
   clientId:     '1eb69ae7-1be2-4d73-a55e-fc0308fcbf1d',
-  clientSecret: '94pT8m2Jm4ZfIyCyxzaJwMJWXa4GF2r3tlyuv_qaw2E',
+  clientSecret: 'G13C__AA5TP3QGzSq-OWV70reIQ9LvyECzgva4Gjq5iXx4GisYMzV2nwD3Yg',
   tokenUrl:     'login.mypurecloud.com',
   apiUrl:       'api.mypurecloud.com',
   typeId:       '0eb59c4e-b628-4b1e-9c83-7cc9ba8c3f2f',
