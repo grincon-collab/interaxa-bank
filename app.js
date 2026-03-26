@@ -1,262 +1,175 @@
-// ═══════════════════════════════════════════
-// INTERAXA BANK - APP.JS
-// ═══════════════════════════════════════════
+/**
+ * Interaxa Bank — Main Application Script
+ * 
+ * Handles:
+ *  - Page navigation (SPA routing)
+ *  - Toast notifications
+ *  - Credit simulator (French amortization system)
+ *  - Range slider UI updates
+ *  - Radio option selectors
+ */
 
-// ═══════════════════════════════════════════
-// NAVIGATION & PAGE HANDLING
-// ═══════════════════════════════════════════
-
-function showPage(pageId) {
-  // Hide all pages
-  const pages = document.querySelectorAll('.page');
-  pages.forEach(page => page.classList.remove('active'));
-  
-  // Show selected page
-  const selectedPage = document.getElementById(pageId);
-  if (selectedPage) {
-    selectedPage.classList.add('active');
-    
-    // Update nav active state
-    document.querySelectorAll('.nav-links a').forEach(link => {
-      link.classList.remove('active');
-    });
-    const navLink = document.getElementById(`nav-${pageId}`);
-    if (navLink) navLink.classList.add('active');
-    
-    // Update URL hash
-    window.location.hash = pageId;
-    
-    // Scroll to top
-    window.scrollTo(0, 0);
+'use strict';
+// ── NAVIGATION ──
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    const navEl = document.getElementById('nav-' + id);
+    if (navEl) navEl.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-}
 
-// Handle URL hash on page load and when hash changes
-function handleHashNavigation() {
-  const hash = window.location.hash.slice(1); // Remove the #
-  const validPages = ['home', 'personal', 'business', 'simulator', 'services'];
-  
-  if (hash && validPages.includes(hash)) {
-    showPage(hash);
-  } else {
-    // Default to home if no valid hash
-    showPage('home');
+  // ── TOAST ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
   }
-}
 
-// Listen for hash changes (browser back/forward buttons)
-window.addEventListener('hashchange', handleHashNavigation);
+  // ── RADIO OPTIONS ──
+  let currentType = 'Libre Inversión';
+  let currentModal = 'Fija mensual';
 
-// Run on page load
-document.addEventListener('DOMContentLoaded', handleHashNavigation);
-
-// ═══════════════════════════════════════════
-// TOAST NOTIFICATIONS
-// ═══════════════════════════════════════════
-
-function showToast(message, duration = 3000) {
-  const toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.classList.add('show');
-  
-  setTimeout(() => {
-    toast.classList.remove('show');
-  }, duration);
-}
-
-// ═══════════════════════════════════════════
-// SIMULATOR FUNCTIONALITY
-// ═══════════════════════════════════════════
-
-let creditType = 'Libre Inversión';
-let modalidad = 'Fija mensual';
-
-function selectType(element, type) {
-  document.querySelectorAll('#creditType .radio-option').forEach(el => {
-    el.classList.remove('selected');
-  });
-  element.classList.add('selected');
-  creditType = type;
-  
-  // Update rates based on type
-  const rateMap = {
-    'Libre Inversión': 18.5,
-    'Hipotecario': 10.9,
-    'Vehículo': 15.5,
-    'Empresarial': 14.2
-  };
-  
-  document.getElementById('tasa').value = rateMap[type];
-  updateTasa(document.getElementById('tasa'));
-}
-
-function selectModal(element, modal) {
-  document.querySelectorAll('#modalidad .radio-option').forEach(el => {
-    el.classList.remove('selected');
-  });
-  element.classList.add('selected');
-  modalidad = modal;
-}
-
-function updateMonto(input) {
-  const monto = parseInt(input.value) * 1000000;
-  document.getElementById('montoVal').textContent = 
-    '$' + monto.toLocaleString('es-CO', {maximumFractionDigits: 0});
-  input.style.setProperty('--val', (input.value / 200 * 100) + '%');
-}
-
-function updatePlazo(input) {
-  const plazo = parseInt(input.value);
-  document.getElementById('plazoVal').textContent = plazo + ' meses';
-  input.style.setProperty('--val', (input.value / 360 * 100) + '%');
-}
-
-function updateTasa(input) {
-  const tasa = parseFloat(input.value);
-  document.getElementById('tasaVal').textContent = tasa.toFixed(1) + '%';
-  input.style.setProperty('--val', ((tasa - 5) / 30 * 100) + '%');
-}
-
-function calcular() {
-  const monto = parseInt(document.getElementById('monto').value) * 1000000;
-  const plazo = parseInt(document.getElementById('plazo').value);
-  const tasaEA = parseFloat(document.getElementById('tasa').value);
-  
-  // Convert EA (Efectivo Anual) to monthly rate
-  const tasaMensual = Math.pow(1 + tasaEA / 100, 1 / 12) - 1;
-  
-  // Calculate monthly payment using amortization formula
-  // PMT = P * [r(1+r)^n] / [(1+r)^n - 1]
-  const numerator = monto * tasaMensual * Math.pow(1 + tasaMensual, plazo);
-  const denominator = Math.pow(1 + tasaMensual, plazo) - 1;
-  const cuotaMensual = numerator / denominator;
-  
-  // Calculate total interest and total paid
-  const totalPagado = cuotaMensual * plazo;
-  const totalIntereses = totalPagado - monto;
-  
-  // Generate amortization table (first 12 months + last month)
-  let tablaAmortizacion = [];
-  let saldoRestante = monto;
-  
-  for (let i = 1; i <= plazo; i++) {
-    const interesMes = saldoRestante * tasaMensual;
-    const capitalMes = cuotaMensual - interesMes;
-    saldoRestante -= capitalMes;
-    
-    // Show first 12 months and last month
-    if (i <= 12 || i === plazo) {
-      tablaAmortizacion.push({
-        mes: i,
-        cuota: cuotaMensual,
-        capital: capitalMes,
-        interes: interesMes,
-        saldo: Math.max(0, saldoRestante)
-      });
-    }
+  function selectType(el, val) {
+    document.querySelectorAll('#creditType .radio-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    currentType = val;
+    const rates = { 'Libre Inversión': 18.5, 'Hipotecario': 10.9, 'Vehículo': 15.2, 'Empresarial': 14.5 };
+    const rangeTasa = document.getElementById('tasa');
+    rangeTasa.value = rates[val];
+    updateTasa(rangeTasa);
   }
-  
-  // Display results
-  displayResults(monto, cuotaMensual, totalIntereses, totalPagado, plazo, tablaAmortizacion);
-}
 
-function displayResults(monto, cuota, interes, totalPagado, plazo, tabla) {
-  const resultsDiv = document.getElementById('simResults');
-  
-  const montoFormat = monto.toLocaleString('es-CO', {maximumFractionDigits: 0});
-  const cuotaFormat = cuota.toLocaleString('es-CO', {maximumFractionDigits: 0});
-  const intereFormat = interes.toLocaleString('es-CO', {maximumFractionDigits: 0});
-  const totalFormat = totalPagado.toLocaleString('es-CO', {maximumFractionDigits: 0});
-  
-  let tablaHTML = '';
-  tabla.forEach((row, index) => {
-    if (index === 12 && tabla.length > 13) {
-      tablaHTML += '<tr style="opacity:0.5;"><td colspan="5" style="text-align:center; padding:8px;">...</td></tr>';
-    }
-    if (index < 12 || index >= tabla.length - 1) {
-      tablaHTML += `
-        <tr>
-          <td class="tabla-cell">${row.mes}</td>
-          <td class="tabla-cell">$${row.cuota.toLocaleString('es-CO', {maximumFractionDigits: 0})}</td>
-          <td class="tabla-cell">$${row.capital.toLocaleString('es-CO', {maximumFractionDigits: 0})}</td>
-          <td class="tabla-cell">$${row.interes.toLocaleString('es-CO', {maximumFractionDigits: 0})}</td>
-          <td class="tabla-cell">$${row.saldo.toLocaleString('es-CO', {maximumFractionDigits: 0})}</td>
-        </tr>
-      `;
-    }
-  });
-  
-  resultsDiv.innerHTML = `
-    <div class="sim-results-header">
-      <div class="sim-results-title">📊 Tu Simulación - ${creditType}</div>
-      <div class="sim-results-subtitle">Resultados precisos basados en los parámetros ingresados</div>
-    </div>
-    
-    <div class="results-grid">
-      <div class="result-card highlight">
-        <div class="result-label">Monto solicitado</div>
-        <div class="result-value">$${montoFormat}</div>
-      </div>
-      <div class="result-card highlight">
-        <div class="result-label">Cuota mensual</div>
-        <div class="result-value">$${cuotaFormat}</div>
-      </div>
-      <div class="result-card">
-        <div class="result-label">Plazo</div>
-        <div class="result-value">${plazo} meses</div>
-      </div>
-      <div class="result-card">
-        <div class="result-label">Total de intereses</div>
-        <div class="result-value">$${intereFormat}</div>
-      </div>
-      <div class="result-card">
-        <div class="result-label">Total pagado</div>
-        <div class="result-value">$${totalFormat}</div>
-      </div>
-    </div>
-    
-    <div class="tabla-section">
-      <h3 class="tabla-title">Tabla de Amortización</h3>
-      <div class="tabla-wrapper">
-        <table class="tabla-amortizacion">
-          <thead>
-            <tr>
-              <th>Mes</th>
-              <th>Cuota</th>
-              <th>Capital</th>
-              <th>Interés</th>
-              <th>Saldo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tablaHTML}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    
-    <div class="cta-section">
-      <p class="cta-text">¿Te interesa este crédito?</p>
-      <button class="btn btn-gold" onclick="showToast('📋 Iniciando solicitud de crédito...')">Solicitar ahora</button>
-      <button class="btn btn-outline" onclick="showToast('📞 Conectando con un asesor...')">Hablar con asesor</button>
-    </div>
-  `;
-}
+  function selectModal(el, val) {
+    document.querySelectorAll('#modalidad .radio-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    currentModal = val;
+  }
 
-// ═══════════════════════════════════════════
-// UTILITIES
-// ═══════════════════════════════════════════
+  // ── RANGE UPDATES ──
+  function fmtMoney(n) {
+    return new Intl.NumberFormat('es-CO').format(n * 1000000);
+  }
 
-// Smooth scroll for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-  anchor.addEventListener('click', function(e) {
-    const href = this.getAttribute('href');
-    if (href !== '#') {
-      e.preventDefault();
-      const target = document.querySelector(href);
-      if (target) {
-        target.scrollIntoView({ behavior: 'smooth' });
-      }
+  function updateMonto(el) {
+    document.getElementById('montoVal').textContent = '$' + fmtMoney(el.value);
+    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+    el.style.setProperty('--val', pct);
+  }
+
+  function updatePlazo(el) {
+    document.getElementById('plazoVal').textContent = el.value + ' meses';
+    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+    el.style.setProperty('--val', pct);
+  }
+
+  function updateTasa(el) {
+    document.getElementById('tasaVal').textContent = parseFloat(el.value).toFixed(1) + '%';
+    const pct = ((el.value - el.min) / (el.max - el.min) * 100) + '%';
+    el.style.setProperty('--val', pct);
+  }
+
+  // ── CALCULATE ──
+  function calcular() {
+    const monto = parseFloat(document.getElementById('monto').value) * 1000000;
+    const plazo = parseInt(document.getElementById('plazo').value);
+    const tasaEA = parseFloat(document.getElementById('tasa').value) / 100;
+
+    // Tasa mensual efectiva
+    const tasaMensual = Math.pow(1 + tasaEA, 1/12) - 1;
+
+    // Cuota fija (sistema francés)
+    const cuota = monto * (tasaMensual * Math.pow(1 + tasaMensual, plazo)) / (Math.pow(1 + tasaMensual, plazo) - 1);
+
+    const totalPagado = cuota * plazo;
+    const totalIntereses = totalPagado - monto;
+
+    // Amortización (primeros 12 + últimos 3 periodos)
+    let saldo = monto;
+    const tabla = [];
+    for (let i = 1; i <= plazo; i++) {
+      const interes = saldo * tasaMensual;
+      const capital = cuota - interes;
+      saldo -= capital;
+      tabla.push({ mes: i, cuota, interes, capital, saldo: Math.max(0, saldo) });
     }
-  });
-});
+
+    // Format COP
+    const fmt = n => new Intl.NumberFormat('es-CO', { style:'currency', currency:'COP', maximumFractionDigits: 0 }).format(n);
+
+    // Render results
+    const preview = tabla.slice(0, 8);
+
+    document.getElementById('simResults').innerHTML = `
+      <div class="result-hero">
+        <div class="result-label">CUOTA MENSUAL ESTIMADA</div>
+        <div class="result-amount">${fmt(cuota)}</div>
+        <div class="result-amount-sub">por ${plazo} meses</div>
+        <div class="result-meta">
+          <div class="result-meta-item">
+            <div class="result-meta-val">${fmt(monto)}</div>
+            <div class="result-meta-key">Monto solicitado</div>
+          </div>
+          <div class="result-meta-item">
+            <div class="result-meta-val">${(tasaEA*100).toFixed(1)}% E.A.</div>
+            <div class="result-meta-key">Tasa efectiva anual</div>
+          </div>
+          <div class="result-meta-item">
+            <div class="result-meta-val">${plazo} m</div>
+            <div class="result-meta-key">Plazo</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-breakdown">
+        <div class="breakdown-title">📊 Resumen financiero · ${currentType}</div>
+        <div class="breakdown-row"><span class="key">Capital solicitado</span><span class="val">${fmt(monto)}</span></div>
+        <div class="breakdown-row"><span class="key">Total intereses</span><span class="val gold">${fmt(totalIntereses)}</span></div>
+        <div class="breakdown-row"><span class="key">Total a pagar</span><span class="val">${fmt(totalPagado)}</span></div>
+        <div class="breakdown-row"><span class="key">Tasa mensual efectiva</span><span class="val">${(tasaMensual*100).toFixed(4)}% M.E.</span></div>
+        <div class="breakdown-row"><span class="key">Tasa E.A.</span><span class="val">${(tasaEA*100).toFixed(2)}% E.A.</span></div>
+        <div class="breakdown-row"><span class="key">Modalidad</span><span class="val">${currentModal}</span></div>
+        <div class="breakdown-row"><span class="key">Costo total del crédito</span><span class="val gold">${((totalIntereses/monto)*100).toFixed(1)}% sobre capital</span></div>
+      </div>
+
+      <div class="amort-table">
+        <div class="amort-header">
+          <span>📋 Tabla de amortización (8 primeras cuotas)</span>
+          <span style="font-size:12px; color:var(--gray); font-weight:400;">Sistema francés</span>
+        </div>
+        <div class="amort-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Cuota</th>
+                <th>Capital</th>
+                <th>Interés</th>
+                <th>Saldo</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${preview.map((r, i) => `
+                <tr class="${i === 0 ? 'highlight-row' : ''}">
+                  <td>${r.mes}</td>
+                  <td>${fmt(r.cuota)}</td>
+                  <td>${fmt(r.capital)}</td>
+                  <td>${fmt(r.interes)}</td>
+                  <td>${fmt(r.saldo)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="text-align:center; padding:4px 0;">
+        <button class="btn btn-gold" onclick="showToast('✅ Solicitud enviada. Un asesor te contactará pronto.')">
+          ✅ Solicitar este crédito
+        </button>
+        <p style="font-size:11px; color:var(--gray); margin-top:10px;">* Simulación informativa. Las condiciones finales están sujetas a estudio de crédito.</p>
+      </div>
+    `;
+  }
